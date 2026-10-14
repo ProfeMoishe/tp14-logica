@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Convierte una imagen a matrices de 16x16, 25x25 y 32x32 píxeles, descarga BMP en color o blanco y negro y obtén el código para Google Colab." />
+<title>Pixelador · Imagen a matriz 16×16, 25×25 y 32×32</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --bg2:#1e293b;
+    --bg3:#0b1220;
+    --borde:#334155;
+    --texto:#e2e8f0;
+    --texto2:#94a3b8;
+    --acento:#38bdf8;
+    --acento2:#818cf8;
+    --ok:#4ade80;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    padding:1rem;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:
+      radial-gradient(1100px 550px at 50% -10%, #1e293b 0%, rgba(15,23,42,0) 65%) no-repeat,
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--texto);
+    line-height:1.55;
+  }
+  .contenedor{max-width:1100px;margin:0 auto;}
+
+  /* ---------- Encabezado ---------- */
+  header{text-align:center;margin:.5rem 0 1.5rem;}
+  h1{
+    font-size:clamp(1.25rem,5.2vw,2rem);
+    margin:.4rem 0;
+    background:linear-gradient(90deg,var(--acento),var(--acento2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    line-height:1.2;
+  }
+  .subtitulo{color:var(--texto2);font-size:.9rem;margin:0;}
+
+  /* ---------- Secciones ---------- */
+  .seccion{
+    background:var(--bg2);
+    border:1px solid var(--borde);
+    border-radius:16px;
+    padding:1rem;
+    margin-bottom:1rem;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  .seccion h2{
+    font-size:1.02rem;margin:0 0 .85rem;
+    display:flex;align-items:center;gap:.55rem;
+  }
+  .num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:1.6rem;height:1.6rem;border-radius:50%;
+    background:linear-gradient(135deg,var(--acento),var(--acento2));
+    color:#04202f;font-weight:800;font-size:.85rem;flex:0 0 auto;
+  }
+  .ayuda{color:var(--texto2);font-size:.85rem;margin:.2rem 0 .9rem;}
+
+  /* ---------- Zona de carga ---------- */
+  #zona{
+    border:2px dashed var(--borde);
+    border-radius:14px;
+    padding:1.6rem 1rem;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .2s,background .2s,transform .15s;
+    background:var(--bg3);
+  }
+  #zona:hover,#zona:focus-visible{border-color:var(--acento);background:#0e1a2e;outline:none;}
+  #zona.arrastrando{border-color:var(--acento);background:#0e1a2e;transform:scale(1.01);}
+  #zona .icono{font-size:2.2rem;display:block;margin-bottom:.35rem;}
+  #zona .principal{margin:.15rem 0;font-weight:600;font-size:.95rem;}
+  #zona .secundario{margin:.15rem 0;font-size:.82rem;color:var(--texto2);}
+  #miniatura{
+    display:none;
+    max-width:150px;max-height:150px;
+    margin:1rem auto 0;
+    border-radius:10px;
+    border:1px solid var(--borde);
+  }
+  #mensaje{font-size:.85rem;color:var(--texto2);margin:.75rem 0 0;text-align:center;min-height:1.2em;}
+
+  /* ---------- Controles ---------- */
+  .controles{
+    display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .8rem;
+    margin-bottom:1rem;font-size:.85rem;color:var(--texto2);
+  }
+  input[type=range]{flex:1 1 140px;min-width:120px;accent-color:var(--acento);height:26px;}
+  .valor{font-variant-numeric:tabular-nums;color:var(--acento);font-weight:700;}
+
+  /* ---------- Galería de previsualizaciones ---------- */
+  .galeria{display:grid;gap:.9rem;grid-template-columns:1fr;}
+  @media(min-width:640px){
+    .galeria{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+  }
+  .tarjeta{
+    background:var(--bg3);
+    border:1px solid var(--borde);
+    border-radius:14px;
+    padding:.8rem;
+  }
+  .tarjeta h3{
+    margin:0 0 .65rem;font-size:.95rem;text-align:center;
+    color:var(--acento);letter-spacing:.3px;
+  }
+  .par{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;}
+  figure{margin:0;}
+  canvas.pixel{
+    display:block;width:100%;height:auto;aspect-ratio:1/1;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    background:#000;
+    border:1px solid var(--borde);
+    border-radius:8px;
+  }
+  figcaption{text-align:center;font-size:.75rem;color:var(--texto2);margin-top:.3rem;}
+
+  /* ---------- Botones ---------- */
+  button{
+    font:inherit;cursor:pointer;border:none;border-radius:10px;
+    padding:.55rem .8rem;min-height:42px;
+    background:linear-gradient(135deg,var(--acento),#22d3ee);
+    color:#04202f;font-weight:700;font-size:.83rem;
+    transition:filter .15s,transform .1s;
+  }
+  button:hover:not(:disabled){filter:brightness(1.1);}
+  button:active:not(:disabled){transform:scale(.98);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  .botones{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem;}
+  .boton-secundario{background:#334155;color:var(--texto);}
+
+  /* ---------- Pestañas del código ---------- */
+  .pestanas{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem;}
+  .pestana{background:#334155;color:var(--texto);}
+  .pestana.activa{background:linear-gradient(135deg,var(--acento),#22d3ee);color:#04202f;}
+
+  /* ---------- Bloque de código ---------- */
+  .barra-codigo{
+    display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between;
+    margin-bottom:.6rem;
+  }
+  .barra-codigo .nota{font-size:.78rem;color:var(--texto2);}
+  pre{
+    margin:0;
+    background:var(--bg3);
+    border:1px solid var(--borde);
+    border-radius:12px;
+    padding:.9rem;
+    overflow:auto;
+    max-height:60vh;
+    font-size:.7rem;
+    line-height:1.5;
+    -webkit-overflow-scrolling:touch;
+  }
+  @media(min-width:700px){ pre{font-size:.82rem;} }
+  code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    white-space:pre;
+    color:#cbd5e1;
+    tab-size:4;
+  }
+
+  footer{
+    text-align:center;color:var(--texto2);font-size:.78rem;
+    padding:1rem 0 2rem;
+  }
+</style>
+</head>
+<body>
+<div class="contenedor">
+
+  <header>
+    <h1>🖼️ Pixelador de imágenes</h1>
+    <p class="subtitulo">Convierte tu imagen en matrices de 16×16, 25×25 y 32×32 píxeles · Descarga en BMP · Código listo para Google Colab</p>
+  </header>
+
+  <!-- ============ PASO 1 ============ -->
+  <section class="seccion">
+    <h2><span class="num">1</span> Carga tu imagen</h2>
+    <p class="ayuda">Puedes tocar la zona para elegir un archivo o arrastrar la imagen hasta aquí.</p>
+
+    <div id="zona" role="button" tabindex="0" aria-label="Cargar imagen">
+      <span class="icono">📷</span>
+      <p class="principal">Toca aquí para elegir una imagen</p>
+      <p class="secundario">o arrástrala y suéltala (JPG, PNG, GIF, WEBP…)</p>
+    </div>
+    <input type="file" id="archivo" accept="image/*" hidden />
+
+    <img id="miniatura" alt="Miniatura de la imagen original" />
+    <p id="mensaje">Aún no has cargado ninguna imagen.</p>
+  </section>
+
+  <!-- ============ PASO 2 ============ -->
+  <section class="seccion">
+    <h2><span class="num">2</span> Previsualización y descarga</h2>
+
+    <div class="controles">
+      <label for="umbral">Umbral blanco / negro:</label>
+      <input type="range" id="umbral" min="0" max="255" value="128" />
+      <span class="valor" id="valor-umbral">128</span>
+    </div>
+
+    <div class="galeria" id="galeria"><!-- Se genera con JavaScript --></div>
+  </section>
+
+  <!-- ============ PASO 3 ============ -->
+  <section class="seccion">
+    <h2><span class="num">3</span> Código para Google Colab</h2>
+    <p class="ayuda">
+      Copia el código, pégalo en una celda de <strong>Google Colab</strong> y ejecútalo.
+      Cambia el tamaño de la matriz con las pestañas de abajo.
+    </p>
+
+    <div class="pestanas" id="pestanas">
+      <button class="pestana" data-n="16">16 × 16</button>
+      <button class="pestana" data-n="25">25 × 25</button>
+      <button class="pestana" data-n="32">32 × 32</button>
+    </div>
+
+    <div class="barra-codigo">
+      <span class="nota" id="nota-codigo"></span>
+      <button id="copiar" class="boton-secundario">📋 Copiar código</button>
+    </div>
+
+    <pre><code id="codigo"></code></pre>
+  </section>
+
+  <footer>
+    Hecho con HTML, CSS y JavaScript puro · Listo para publicar en GitHub Pages
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     CONSTANTES Y REFERENCIAS AL DOM
+     ========================================================= */
+  const TAMANOS = [16, 25, 32];          // los tres tamaños de matriz
+
+  const galeria      = document.getElementById('galeria');
+  const zona         = document.getElementById('zona');
+  const entrada      = document.getElementById('archivo');
+  const miniatura    = document.getElementById('miniatura');
+  const mensaje      = document.getElementById('mensaje');
+  const slider       = document.getElementById('umbral');
+  const valorUmbral  = document.getElementById('valor-umbral');
+  const botonCopiar  = document.getElementById('copiar');
+  const cajaCodigo   = document.getElementById('codigo');
+  const notaCodigo   = document.getElementById('nota-codigo');
+  const contPestanas = document.getElementById('pestanas');
+
+  let datos = {};            // { 16: ImageData, 25: ImageData, 32: ImageData }
+  let imagenOriginal = null; // objeto Image con la imagen cargada
+  let umbral = 128;          // umbral para blanco y negro
+  let codigoVisible = '';    // código que se está mostrando ahora mismo
+
+  /* =========================================================
+     1) CREAR LA GALERÍA DE PREVISUALIZACIONES
+     Se generan las 3 tarjetas (16, 25 y 32) con sus 2 lienzos
+     (color y blanco/negro) y sus 2 botones de descarga.
+     ========================================================= */
+  TAMANOS.forEach(function (n) {
+    const tarjeta = document.createElement('article');
+    tarjeta.className = 'tarjeta';
+    tarjeta.innerHTML =
+      '<h3>' + n + ' × ' + n + ' píxeles</h3>' +
+      '<div class="par">' +
+        '<figure>' +
+          '<canvas class="pixel" id="cv-color-' + n + '" width="' + n + '" height="' + n + '"></canvas>' +
+          '<figcaption>Color</figcaption>' +
+        '</figure>' +
+        '<figure>' +
+          '<canvas class="pixel" id="cv-bn-' + n + '" width="' + n + '" height="' + n + '"></canvas>' +
+          '<figcaption>Blanco y negro</figcaption>' +
+        '</figure>' +
+      '</div>' +
+      '<div class="botones">' +
+        '<button data-tipo="color" data-n="' + n + '" disabled>⬇ BMP color</button>' +
+        '<button data-tipo="bn" data-n="' + n + '" disabled>⬇ BMP B/N</button>' +
+      '</div>';
+    galeria.appendChild(tarjeta);
+  });
+
+  /* =========================================================
+     2) CARGA DE LA IMAGEN (clic, teclado y arrastrar-soltar)
+     ========================================================= */
+  zona.addEventListener('click', function () { entrada.click(); });
+
+  zona.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      entrada.click();
+    }
+  });
+
+  entrada.addEventListener('change', function () {
+    if (entrada.files && entrada.files[0]) cargarArchivo(entrada.files[0]);
+  });
+
+  ['dragenter', 'dragover'].forEach(function (evt) {
+    zona.addEventListener(evt, function (e) {
+      e.preventDefault();
+      zona.classList.add('arrastrando');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(function (evt) {
+    zona.addEventListener(evt, function (e) {
+      e.preventDefault();
+      zona.classList.remove('arrastrando');
+    });
+  });
+
+  zona.addEventListener('drop', function (e) {
+    const archivos = e.dataTransfer && e.dataTransfer.files;
+    if (archivos && archivos[0]) cargarArchivo(archivos[0]);
+  });
+
+  function cargarArchivo(archivo) {
+    if (!archivo.type || archivo.type.indexOf('image/') !== 0) {
+      mensaje.textContent = '⚠️ El archivo debe ser una imagen (JPG, PNG, WEBP…).';
+      return;
+    }
+    mensaje.textContent = '⏳ Procesando imagen…';
+
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+
+    img.onload = function () {
+      imagenOriginal = img;
+      miniatura.src = url;
+      miniatura.style.display = 'block';
+      procesarImagen();
+      mensaje.textContent =
+        '✅ Imagen cargada: ' + archivo.name +
+        ' (' + img.naturalWidth + '×' + img.naturalHeight + ' px). ' +
+        'Ya puedes descargar los BMP.';
+      URL.revokeObjectURL(url);
+    };
+
+    img.onerror = function () {
+      mensaje.textContent = '❌ No se pudo leer la imagen. Prueba con otro archivo.';
+      URL.revokeObjectURL(url);
+    };
+
+    img.src = url;
+  }
+
+  /* =========================================================
+     3) PROCESAR LA IMAGEN: reducir a N×N píxeles
+     Se dibuja la imagen en un lienzo del tamaño exacto (N×N).
+     El navegador hace el promedio de color de cada bloque.
+     Luego se leen los píxeles con getImageData.
+     ========================================================= */
+  function procesarImagen() {
+    if (!imagenOriginal) return;
+
+    datos = {};
+
+    TAMANOS.forEach(function (n) {
+      const lienzo = document.createElement('canvas');
+      lienzo.width = n;
+      lienzo.height = n;
+
+      const ctx = lienzo.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(imagenOriginal, 0, 0, n, n);
+
+      datos[n] = ctx.getImageData(0, 0, n, n);
+    });
+
+    pintarTodo();
+    habilitarBotones(true);
+  }
+
+  /* =========================================================
+     4) CONVERTIR A BLANCO Y NEGRO
+     Se calcula la luminosidad de cada píxel y se compara con
+     el umbral: si es menor → negro (0), si no → blanco (255).
+     ========================================================= */
+  function aBlancoYNegro(imageData, corte) {
+    const ancho = imageData.width;
+    const alto  = imageData.height;
+    const origen = imageData.data;
+
+    // ImageData nuevo y vacío del mismo tamaño
+    const salida = new ImageData(ancho, alto);
+    const destino = salida.data;
+
+    for (let i = 0; i < origen.length; i += 4) {
+      // Fórmula de luminosidad percibida (el ojo humano ve más el verde)
+      const luminosidad = 0.299 * origen[i] + 0.587 * origen[i + 1] + 0.114 * origen[i + 2];
+      const v = luminosidad < corte ? 0 : 255;
+      destino[i]     = v;   // R
+      destino[i + 1] = v;   // G
+      destino[i + 2] = v;   // B
+      destino[i + 3] = 255; // A (opaco)
+    }
+    return salida;
+  }
+
+  /* =========================================================
+     5) DIBUJAR LAS PREVISUALIZACIONES EN LOS LIENZOS
+     ========================================================= */
+  function pintarTodo() {
+    TAMANOS.forEach(function (n) {
+      if (!datos[n]) return;
+      const cvColor = document.getElementById('cv-color-' + n);
+      const cvBN    = document.getElementById('cv-bn-' + n);
+      cvColor.getContext('2d').putImageData(datos[n], 0, 0);
+      cvBN.getContext('2d').putImageData(aBlancoYNegro(datos[n], umbral), 0, 0);
+    });
+  }
+
+  function habilitarBotones(activo) {
+    galeria.querySelectorAll('button[data-tipo]').forEach(function (b) {
+      b.disabled = !activo;
+    });
+  }
+
+  /* =========================================================
+     6) SLIDER DEL UMBRAL
+     ========================================================= */
+  slider.addEventListener('input', function () {
+    umbral = Number(slider.value);
+    valorUmbral.textContent = umbral;
+    pintarTodo();
+  });
+
+  /* =========================================================
+     7) GENERAR UN ARCHIVO BMP (24 bits) EN EL NAVEGADOR
+     El formato BMP guarda:
+       - 14 bytes de cabecera de archivo
+       - 40 bytes de cabecera de imagen (BITMAPINFOHEADER)
+       - Los píxeles en orden BGR, de abajo hacia arriba,
+         y cada fila rellenada hasta múltiplo de 4 bytes.
+     ========================================================= */
+  function crearBMP(ancho, alto, pixeles) {
+    const bytesPorFila = ancho * 3;                       // 3 bytes por píxel (B, G, R)
+    const relleno = (4 - (bytesPorFila % 4)) % 4;         // relleno para alinear a 4
+    const tamFila = bytesPorFila + relleno;
+    const tamDatos = tamFila * alto;
+    const tamArchivo = 54 + tamDatos;                     // 54 = 14 + 40
+
+    const buffer = new ArrayBuffer(tamArchivo);
+    const vista  = new DataView(buffer);
+    const bytes  = new Uint8Array(buffer);
+
+    /* --- Cabecera de archivo (14 bytes) --- */
+    bytes[0] = 0x42;                       // 'B'
+    bytes[1] = 0x4D;                       // 'M'
+    vista.setUint32(2,  tamArchivo, true); // tamaño total del archivo
+    vista.setUint32(6,  0, true);          // reservado
+    vista.setUint32(10, 54, true);         // offset donde empiezan los píxeles
+
+    /* --- Cabecera DIB BITMAPINFOHEADER (40 bytes) --- */
+    vista.setUint32(14, 40, true);         // tamaño de esta cabecera
+    vista.setInt32(18, ancho, true);       // ancho en píxeles
+    vista.setInt32(22, alto, true);        // alto en píxeles (positivo = abajo→arriba)
+    vista.setUint16(26, 1, true);          // número de planos
+    vista.setUint16(28, 24, true);         // bits por píxel (24 = color real)
+    vista.setUint32(30, 0, true);          // sin compresión
+    vista.setUint32(34, tamDatos, true);   // tamaño de los datos de imagen
+    vista.setInt32(38, 2835, true);        // resolución horizontal (72 ppp)
+    vista.setInt32(42, 2835, true);        // resolución vertical (72 ppp)
+    vista.setUint32(46, 0, true);          // colores de la paleta
+    vista.setUint32(50, 0, true);          // colores importantes
+
+    /* --- Datos de los píxeles --- */
+    let offset = 54;
+    for (let y = alto - 1; y >= 0; y--) {          // BMP se escribe de abajo hacia arriba
+      for (let x = 0; x < ancho; x++) {
+        const i = (y * ancho + x) * 4;             // índice en el arreglo RGBA
+        bytes[offset++] = pixeles[i + 2];          // B
+        bytes[offset++] = pixeles[i + 1];          // G
+        bytes[offset++] = pixeles[i];              // R
+      }
+      for (let p = 0; p < relleno; p++) bytes[offset++] = 0; // relleno de la fila
+    }
+
+    return new Blob([buffer], { type: 'image/bmp' });
+  }
+
+  /* =========================================================
+     8) DESCARGAR UN ARCHIVO
+     ========================================================= */
+  function descargar(nombre, blob) {
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombre;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  /* =========================================================
+     9) CLIC EN LOS BOTONES DE DESCARGA
+     ========================================================= */
+  galeria.addEventListener('click', function (e) {
+    const boton = e.target.closest('button[data-tipo]');
+    if (!boton) return;
+
+    const n = Number(boton.dataset.n);
+    const tipo = boton.dataset.tipo;
+    if (!datos[n]) return;
+
+    const imageData = (tipo === 'color')
+      ? datos[n]
+      : aBlancoYNegro(datos[n], umbral);
+
+    const sufijo = (tipo === 'color') ? 'color' : 'blanco_y_negro';
+    const nombre = 'matriz_' + n + 'x' + n + '_' + sufijo + '.bmp';
+
+    descargar(nombre, crearBMP(n, n, imageData.data));
+  });
+
+  /* =========================================================
+     10) CÓDIGO PYTHON PARA GOOGLE COLAB
+     Se genera según el tamaño elegido. Está comentado paso a paso
+     e incluye el recorrido de la matriz con "for" anidados.
+     ========================================================= */
+  function codigoPython(N) {
+    return String.raw`# ================================================================
+#  IMAGEN -> MATRIZ DE ${N} x ${N} PIXELES
+#  Codigo listo para copiar y pegar en una celda de Google Colab
+# ----------------------------------------------------------------
+#  QUE HACE ESTE PROGRAMA
+#   1. Pide subir una imagen (JPG, PNG, etc.).
+#   2. La reduce a una matriz de ${N} x ${N} pixeles (${N * N} valores).
+#   3. Muestra la matriz como numeros y como imagen.
+#   4. Recorre la matriz con DOS ciclos "for" anidados.
+#   5. Guarda el resultado como archivo .BMP (color y blanco/negro).
+# ================================================================
+
+# ---------- PASO 1: importar las librerias ----------------------
+from google.colab import files      # sirve para subir y descargar archivos en Colab
+from PIL import Image               # Pillow: abrir, convertir y redimensionar imagenes
+import numpy as np                  # NumPy: trabajar con matrices de numeros
+import io                           # io: leer el archivo subido en memoria
+import matplotlib.pyplot as plt     # mostrar la imagen dentro del notebook
+
+# ---------- PASO 2: parametros del programa ---------------------
+N = ${N}          # ancho y alto de la matriz (${N} x ${N})
+UMBRAL = 128    # corte para decidir negro o blanco: menor a 128 = negro
+
+# ---------- PASO 3: subir la imagen -----------------------------
+print("Selecciona una imagen (JPG o PNG):")
+subidos = files.upload()                   # abre la ventana de carga de archivos
+nombre_archivo = list(subidos.keys())[0]   # toma el nombre del primer archivo subido
+print("Archivo cargado:", nombre_archivo)
+
+# ---------- PASO 4: abrir la imagen -----------------------------
+# io.BytesIO convierte los bytes subidos en un "archivo" que Pillow puede abrir
+imagen = Image.open(io.BytesIO(subidos[nombre_archivo]))
+print("Tamano original (ancho, alto):", imagen.size)
+
+# ---------- PASO 5: convertir a escala de grises y reducir ------
+#  .convert("L")   -> deja UN solo canal: 0 = negro, 255 = blanco
+#  .resize((N, N)) -> reduce la imagen a N x N pixeles
+#  Image.LANCZOS   -> metodo de muestreo de buena calidad (promedia los bloques)
+imagen_gris = imagen.convert("L").resize((N, N), Image.LANCZOS)
+
+# ---------- PASO 6: convertir la imagen en MATRIZ ---------------
+# np.array() transforma la imagen en una matriz de numeros enteros (0 a 255)
+matriz = np.array(imagen_gris)
+print("Forma de la matriz:", matriz.shape)   # (${N}, ${N})
+
+# ---------- PASO 7: mostrar la matriz como numeros --------------
+print("\n===== MATRIZ DE VALORES (0 a 255) =====")
+print(matriz)
+
+# ---------- PASO 8: mostrar la matriz como imagen ---------------
+plt.figure(figsize=(4, 4))
+plt.imshow(matriz, cmap="gray", vmin=0, vmax=255)  # cmap gris de 0 a 255
+plt.title("Imagen reducida a ${N} x ${N} pixeles")
+plt.axis("off")   # oculta los ejes
+plt.show()
+
+# ---------- PASO 9: RECORRER LA MATRIZ CON FOR ANIDADOS ---------
+#  El PRIMER for recorre las FILAS (i).
+#  El SEGUNDO for recorre las COLUMNAS (j) dentro de esa fila.
+#  matriz[i][j] es el valor del pixel en la fila i y la columna j (0 a 255).
+print("\n===== MATRIZ DIBUJADA CON FOR ANIDADOS =====")
+
+for i in range(N):              # i = 0, 1, 2, ... , ${N - 1}  -> FILAS
+    linea = ""                  # aqui se va armando la fila como texto
+    for j in range(N):          # j = 0, 1, 2, ... , ${N - 1}  -> COLUMNAS
+        valor = matriz[i][j]    # se lee el pixel de la fila i, columna j
+        if valor < UMBRAL:
+            linea += "##"       # pixel oscuro
+        else:
+            linea += ".."       # pixel claro
+    print(linea)                # al terminar la fila completa, se imprime
+
+# ---------- PASO 10: crear la version en BLANCO Y NEGRO ---------
+# np.where(condicion, valor_si_True, valor_si_False)
+bn = np.where(matriz < UMBRAL, 0, 255).astype(np.uint8)
+
+# ---------- PASO 11: guardar el BMP en BLANCO Y NEGRO -----------
+# Se pasa a RGB porque el BMP clasico guarda 3 canales (R, G, B)
+archivo_bn = "matriz_${N}x${N}_blanco_y_negro.bmp"
+Image.fromarray(bn).convert("RGB").save(archivo_bn)
+print("Archivo guardado:", archivo_bn)
+files.download(archivo_bn)      # lo descarga a tu computador
+
+# ---------- PASO 12: version en COLOR ---------------------------
+# Ahora cada pixel tiene 3 valores: matriz_color[i][j] = [R, G, B]
+imagen_color = imagen.convert("RGB").resize((N, N), Image.LANCZOS)
+matriz_color = np.array(imagen_color)
+print("\nForma de la matriz en color:", matriz_color.shape)   # (${N}, ${N}, 3)
+
+for i in range(N):                     # FILAS
+    for j in range(N):                 # COLUMNAS
+        r, g, b = matriz_color[i][j]   # los 3 canales del pixel
+        # Aqui se puede operar con r, g, b (por ejemplo invertir el color)
+        # print(f"Fila {i}, Columna {j} -> R={r} G={g} B={b}")
+    # fin del for de las columnas
+# fin del for de las filas
+
+archivo_color = "matriz_${N}x${N}_color.bmp"
+Image.fromarray(matriz_color).save(archivo_color)
+print("Archivo guardado:", archivo_color)
+files.download(archivo_color)
+
+# ---------- PASO 13: cambiar el tamano de la matriz -------------
+#  Para trabajar con otra matriz solo cambia el valor de N en el PASO 2:
+#      N = 16   ->  matriz de 16 x 16
+#      N = 25   ->  matriz de 25 x 25
+#      N = 32   ->  matriz de 32 x 32
+`;
+  }
+
+  /* =========================================================
+     11) PESTAÑAS: mostrar el código del tamaño elegido
+     ========================================================= */
+  function mostrarCodigo(n) {
+    codigoVisible = codigoPython(n);
+    cajaCodigo.textContent = codigoVisible;
+    notaCodigo.textContent = 'Matriz de ' + n + ' × ' + n + ' (' + (n * n) + ' píxeles)';
+
+    contPestanas.querySelectorAll('.pestana').forEach(function (p) {
+      p.classList.toggle('activa', Number(p.dataset.n) === n);
+    });
+  }
+
+  contPestanas.addEventListener('click', function (e) {
+    const p = e.target.closest('.pestana');
+    if (p) mostrarCodigo(Number(p.dataset.n));
+  });
+
+  /* =========================================================
+     12) BOTÓN COPIAR CÓDIGO
+     ========================================================= */
+  botonCopiar.addEventListener('click', function () {
+    const textoOriginal = botonCopiar.textContent;
+
+    function confirmar() {
+      botonCopiar.textContent = '✅ ¡Copiado!';
+      setTimeout(function () { botonCopiar.textContent = textoOriginal; }, 2000);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(codigoVisible).then(confirmar).catch(copiaAntigua);
+    } else {
+      copiaAntigua();
+    }
+
+    function copiaAntigua() {
+      // Alternativa para navegadores antiguos o contextos sin HTTPS
+      const area = document.createElement('textarea');
+      area.value = codigoVisible;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      try { document.execCommand('copy'); confirmar(); }
+      catch (err) { alert('Copia el código manualmente seleccionándolo.'); }
+      area.remove();
+    }
+  });
+
+  /* =========================================================
+     13) INICIALIZACIÓN
+     ========================================================= */
+  mostrarCodigo(16);
+})();
+</script>
+</body>
+</html>
