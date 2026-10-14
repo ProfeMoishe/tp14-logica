@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="Convierte una imagen a matrices de 16x16, 25x25 y 32x32 píxeles, descarga BMP en color o blanco y negro y obtén el código para Google Colab." />
+<meta name="description" content="Convierte una imagen a matrices de 16x16, 25x25 y 32x32 píxeles en color, escala de grises y blanco/negro. Descarga BMP y obtén el código para Google Colab." />
 <title>Pixelador · Imagen a matriz 16×16, 25×25 y 32×32</title>
 <style>
   :root{
@@ -99,7 +99,7 @@
   /* ---------- Galería de previsualizaciones ---------- */
   .galeria{display:grid;gap:.9rem;grid-template-columns:1fr;}
   @media(min-width:640px){
-    .galeria{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+    .galeria{grid-template-columns:repeat(auto-fit,minmax(320px,1fr));}
   }
   .tarjeta{
     background:var(--bg3);
@@ -111,7 +111,8 @@
     margin:0 0 .65rem;font-size:.95rem;text-align:center;
     color:var(--acento);letter-spacing:.3px;
   }
-  .par{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;}
+  /* 3 previsualizaciones por tarjeta (color, grises, B/N) */
+  .par{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;}
   figure{margin:0;}
   canvas.pixel{
     display:block;width:100%;height:auto;aspect-ratio:1/1;
@@ -121,20 +122,20 @@
     border:1px solid var(--borde);
     border-radius:8px;
   }
-  figcaption{text-align:center;font-size:.75rem;color:var(--texto2);margin-top:.3rem;}
+  figcaption{text-align:center;font-size:.7rem;color:var(--texto2);margin-top:.3rem;}
 
   /* ---------- Botones ---------- */
   button{
     font:inherit;cursor:pointer;border:none;border-radius:10px;
-    padding:.55rem .8rem;min-height:42px;
+    padding:.5rem .4rem;min-height:42px;
     background:linear-gradient(135deg,var(--acento),#22d3ee);
-    color:#04202f;font-weight:700;font-size:.83rem;
+    color:#04202f;font-weight:700;font-size:.75rem;
     transition:filter .15s,transform .1s;
   }
   button:hover:not(:disabled){filter:brightness(1.1);}
   button:active:not(:disabled){transform:scale(.98);}
   button:disabled{opacity:.4;cursor:not-allowed;}
-  .botones{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem;}
+  .botones{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-top:.75rem;}
   .boton-secundario{background:#334155;color:var(--texto);}
 
   /* ---------- Pestañas del código ---------- */
@@ -179,7 +180,7 @@
 
   <header>
     <h1>🖼️ Pixelador de imágenes</h1>
-    <p class="subtitulo">Convierte tu imagen en matrices de 16×16, 25×25 y 32×32 píxeles · Descarga en BMP · Código listo para Google Colab</p>
+    <p class="subtitulo">Convierte tu imagen en matrices de 16×16, 25×25 y 32×32 · Color · Grises · Blanco y negro · Código listo para Google Colab</p>
   </header>
 
   <!-- ============ PASO 1 ============ -->
@@ -266,8 +267,9 @@
 
   /* =========================================================
      1) CREAR LA GALERÍA DE PREVISUALIZACIONES
-     Se generan las 3 tarjetas (16, 25 y 32) con sus 2 lienzos
-     (color y blanco/negro) y sus 2 botones de descarga.
+     Se generan las 3 tarjetas (16, 25 y 32) y cada tarjeta
+     trae TRES lienzos (color, grises y B/N) más TRES botones
+     de descarga BMP (color, grises y B/N).
      ========================================================= */
   TAMANOS.forEach(function (n) {
     const tarjeta = document.createElement('article');
@@ -280,13 +282,18 @@
           '<figcaption>Color</figcaption>' +
         '</figure>' +
         '<figure>' +
+          '<canvas class="pixel" id="cv-gris-' + n + '" width="' + n + '" height="' + n + '"></canvas>' +
+          '<figcaption>Grises</figcaption>' +
+        '</figure>' +
+        '<figure>' +
           '<canvas class="pixel" id="cv-bn-' + n + '" width="' + n + '" height="' + n + '"></canvas>' +
-          '<figcaption>Blanco y negro</figcaption>' +
+          '<figcaption>B/N</figcaption>' +
         '</figure>' +
       '</div>' +
       '<div class="botones">' +
-        '<button data-tipo="color" data-n="' + n + '" disabled>⬇ BMP color</button>' +
-        '<button data-tipo="bn" data-n="' + n + '" disabled>⬇ BMP B/N</button>' +
+        '<button data-tipo="color" data-n="' + n + '" title="Descargar BMP en color" disabled>⬇ Color</button>' +
+        '<button data-tipo="gris"  data-n="' + n + '" title="Descargar BMP en escala de grises" disabled>⬇ Grises</button>' +
+        '<button data-tipo="bn"    data-n="' + n + '" title="Descargar BMP en blanco y negro" disabled>⬇ B/N</button>' +
       '</div>';
     galeria.appendChild(tarjeta);
   });
@@ -385,7 +392,35 @@
   }
 
   /* =========================================================
-     4) CONVERTIR A BLANCO Y NEGRO
+     4) CONVERTIR A ESCALA DE GRISES
+     Se calcula la luminosidad percibida de cada píxel:
+        L = 0.299·R + 0.587·G + 0.114·B
+     Esos coeficientes reflejan cuánto "ve" el ojo humano cada
+     canal (verde mucho, azul poco). El resultado se copia en
+     los tres canales para obtener un gris neutro.
+     ========================================================= */
+  function aEscalaDeGrises(imageData) {
+    const ancho = imageData.width;
+    const alto  = imageData.height;
+    const origen = imageData.data;
+
+    const salida = new ImageData(ancho, alto);
+    const destino = salida.data;
+
+    for (let i = 0; i < origen.length; i += 4) {
+      const luminosidad =
+        0.299 * origen[i] + 0.587 * origen[i + 1] + 0.114 * origen[i + 2];
+      const v = Math.round(luminosidad);
+      destino[i]     = v;   // R
+      destino[i + 1] = v;   // G
+      destino[i + 2] = v;   // B
+      destino[i + 3] = 255; // A (opaco)
+    }
+    return salida;
+  }
+
+  /* =========================================================
+     5) CONVERTIR A BLANCO Y NEGRO
      Se calcula la luminosidad de cada píxel y se compara con
      el umbral: si es menor → negro (0), si no → blanco (255).
      ========================================================= */
@@ -394,12 +429,10 @@
     const alto  = imageData.height;
     const origen = imageData.data;
 
-    // ImageData nuevo y vacío del mismo tamaño
     const salida = new ImageData(ancho, alto);
     const destino = salida.data;
 
     for (let i = 0; i < origen.length; i += 4) {
-      // Fórmula de luminosidad percibida (el ojo humano ve más el verde)
       const luminosidad = 0.299 * origen[i] + 0.587 * origen[i + 1] + 0.114 * origen[i + 2];
       const v = luminosidad < corte ? 0 : 255;
       destino[i]     = v;   // R
@@ -411,15 +444,19 @@
   }
 
   /* =========================================================
-     5) DIBUJAR LAS PREVISUALIZACIONES EN LOS LIENZOS
+     6) DIBUJAR LAS PREVISUALIZACIONES EN LOS LIENZOS
+     (color, escala de grises y blanco/negro)
      ========================================================= */
   function pintarTodo() {
     TAMANOS.forEach(function (n) {
       if (!datos[n]) return;
       const cvColor = document.getElementById('cv-color-' + n);
-      const cvBN    = document.getElementById('cv-bn-' + n);
+      const cvGris  = document.getElementById('cv-gris-'  + n);
+      const cvBN    = document.getElementById('cv-bn-'    + n);
+
       cvColor.getContext('2d').putImageData(datos[n], 0, 0);
-      cvBN.getContext('2d').putImageData(aBlancoYNegro(datos[n], umbral), 0, 0);
+      cvGris .getContext('2d').putImageData(aEscalaDeGrises(datos[n]), 0, 0);
+      cvBN   .getContext('2d').putImageData(aBlancoYNegro(datos[n], umbral), 0, 0);
     });
   }
 
@@ -430,7 +467,7 @@
   }
 
   /* =========================================================
-     6) SLIDER DEL UMBRAL
+     7) SLIDER DEL UMBRAL
      ========================================================= */
   slider.addEventListener('input', function () {
     umbral = Number(slider.value);
@@ -439,7 +476,7 @@
   });
 
   /* =========================================================
-     7) GENERAR UN ARCHIVO BMP (24 bits) EN EL NAVEGADOR
+     8) GENERAR UN ARCHIVO BMP (24 bits) EN EL NAVEGADOR
      El formato BMP guarda:
        - 14 bytes de cabecera de archivo
        - 40 bytes de cabecera de imagen (BITMAPINFOHEADER)
@@ -447,11 +484,11 @@
          y cada fila rellenada hasta múltiplo de 4 bytes.
      ========================================================= */
   function crearBMP(ancho, alto, pixeles) {
-    const bytesPorFila = ancho * 3;                       // 3 bytes por píxel (B, G, R)
-    const relleno = (4 - (bytesPorFila % 4)) % 4;         // relleno para alinear a 4
+    const bytesPorFila = ancho * 3;
+    const relleno = (4 - (bytesPorFila % 4)) % 4;
     const tamFila = bytesPorFila + relleno;
     const tamDatos = tamFila * alto;
-    const tamArchivo = 54 + tamDatos;                     // 54 = 14 + 40
+    const tamArchivo = 54 + tamDatos;
 
     const buffer = new ArrayBuffer(tamArchivo);
     const vista  = new DataView(buffer);
@@ -460,40 +497,40 @@
     /* --- Cabecera de archivo (14 bytes) --- */
     bytes[0] = 0x42;                       // 'B'
     bytes[1] = 0x4D;                       // 'M'
-    vista.setUint32(2,  tamArchivo, true); // tamaño total del archivo
-    vista.setUint32(6,  0, true);          // reservado
-    vista.setUint32(10, 54, true);         // offset donde empiezan los píxeles
+    vista.setUint32(2,  tamArchivo, true);
+    vista.setUint32(6,  0, true);
+    vista.setUint32(10, 54, true);
 
     /* --- Cabecera DIB BITMAPINFOHEADER (40 bytes) --- */
-    vista.setUint32(14, 40, true);         // tamaño de esta cabecera
-    vista.setInt32(18, ancho, true);       // ancho en píxeles
-    vista.setInt32(22, alto, true);        // alto en píxeles (positivo = abajo→arriba)
-    vista.setUint16(26, 1, true);          // número de planos
-    vista.setUint16(28, 24, true);         // bits por píxel (24 = color real)
-    vista.setUint32(30, 0, true);          // sin compresión
-    vista.setUint32(34, tamDatos, true);   // tamaño de los datos de imagen
-    vista.setInt32(38, 2835, true);        // resolución horizontal (72 ppp)
-    vista.setInt32(42, 2835, true);        // resolución vertical (72 ppp)
-    vista.setUint32(46, 0, true);          // colores de la paleta
-    vista.setUint32(50, 0, true);          // colores importantes
+    vista.setUint32(14, 40, true);
+    vista.setInt32(18, ancho, true);
+    vista.setInt32(22, alto, true);
+    vista.setUint16(26, 1, true);
+    vista.setUint16(28, 24, true);
+    vista.setUint32(30, 0, true);
+    vista.setUint32(34, tamDatos, true);
+    vista.setInt32(38, 2835, true);
+    vista.setInt32(42, 2835, true);
+    vista.setUint32(46, 0, true);
+    vista.setUint32(50, 0, true);
 
     /* --- Datos de los píxeles --- */
     let offset = 54;
-    for (let y = alto - 1; y >= 0; y--) {          // BMP se escribe de abajo hacia arriba
+    for (let y = alto - 1; y >= 0; y--) {
       for (let x = 0; x < ancho; x++) {
-        const i = (y * ancho + x) * 4;             // índice en el arreglo RGBA
-        bytes[offset++] = pixeles[i + 2];          // B
-        bytes[offset++] = pixeles[i + 1];          // G
-        bytes[offset++] = pixeles[i];              // R
+        const i = (y * ancho + x) * 4;
+        bytes[offset++] = pixeles[i + 2]; // B
+        bytes[offset++] = pixeles[i + 1]; // G
+        bytes[offset++] = pixeles[i];     // R
       }
-      for (let p = 0; p < relleno; p++) bytes[offset++] = 0; // relleno de la fila
+      for (let p = 0; p < relleno; p++) bytes[offset++] = 0;
     }
 
     return new Blob([buffer], { type: 'image/bmp' });
   }
 
   /* =========================================================
-     8) DESCARGAR UN ARCHIVO
+     9) DESCARGAR UN ARCHIVO
      ========================================================= */
   function descargar(nombre, blob) {
     const url = URL.createObjectURL(blob);
@@ -507,7 +544,7 @@
   }
 
   /* =========================================================
-     9) CLIC EN LOS BOTONES DE DESCARGA
+     10) CLIC EN LOS BOTONES DE DESCARGA (color, grises, B/N)
      ========================================================= */
   galeria.addEventListener('click', function (e) {
     const boton = e.target.closest('button[data-tipo]');
@@ -517,20 +554,26 @@
     const tipo = boton.dataset.tipo;
     if (!datos[n]) return;
 
-    const imageData = (tipo === 'color')
-      ? datos[n]
-      : aBlancoYNegro(datos[n], umbral);
+    let imageData, sufijo;
+    if (tipo === 'color') {
+      imageData = datos[n];
+      sufijo = 'color';
+    } else if (tipo === 'gris') {
+      imageData = aEscalaDeGrises(datos[n]);
+      sufijo = 'escala_de_grises';
+    } else {
+      imageData = aBlancoYNegro(datos[n], umbral);
+      sufijo = 'blanco_y_negro';
+    }
 
-    const sufijo = (tipo === 'color') ? 'color' : 'blanco_y_negro';
     const nombre = 'matriz_' + n + 'x' + n + '_' + sufijo + '.bmp';
-
     descargar(nombre, crearBMP(n, n, imageData.data));
   });
 
   /* =========================================================
-     10) CÓDIGO PYTHON PARA GOOGLE COLAB
-     Se genera según el tamaño elegido. Está comentado paso a paso
-     e incluye el recorrido de la matriz con "for" anidados.
+     11) CÓDIGO PYTHON PARA GOOGLE COLAB
+     Se genera según el tamaño elegido. Incluye explicación
+     de cada librería y los tres formatos de salida.
      ========================================================= */
   function codigoPython(N) {
     return String.raw`# ================================================================
@@ -542,39 +585,71 @@
 #   2. La reduce a una matriz de ${N} x ${N} pixeles (${N * N} valores).
 #   3. Muestra la matriz como numeros y como imagen.
 #   4. Recorre la matriz con DOS ciclos "for" anidados.
-#   5. Guarda el resultado como archivo .BMP (color y blanco/negro).
+#   5. Guarda el resultado como .BMP en TRES versiones:
+#        - color
+#        - escala de grises
+#        - blanco y negro
 # ================================================================
 
 # ---------- PASO 1: importar las librerias ----------------------
-from google.colab import files      # sirve para subir y descargar archivos en Colab
-from PIL import Image               # Pillow: abrir, convertir y redimensionar imagenes
-import numpy as np                  # NumPy: trabajar con matrices de numeros
-import io                           # io: leer el archivo subido en memoria
-import matplotlib.pyplot as plt     # mostrar la imagen dentro del notebook
+# Cada libreria cumple una funcion distinta dentro del programa:
+
+#  google.colab.files -> conecta el notebook con TU computador:
+#      * files.upload()   abre la ventana para subir un archivo.
+#      * files.download() envia un archivo generado a tu descarga.
+#    Sin esta libreria no podriamos traer la imagen ni sacar los BMP.
+from google.colab import files
+
+#  PIL.Image (Pillow) -> es la libreria de imagenes:
+#      * Image.open()      abre el archivo subido y reconoce su formato.
+#      * .convert("L")     pasa la imagen a escala de grises (1 canal).
+#      * .convert("RGB")   la deja en 3 canales (Rojo, Verde, Azul).
+#      * .resize((N, N))   la reduce al tamano de la matriz que queremos.
+#    Es la que hace la "magia" de pasar de foto a cuadricula de pixeles.
+from PIL import Image
+
+#  numpy -> maneja la imagen como una MATRIZ de numeros:
+#      * np.array(imagen) convierte la imagen en un arreglo numerico
+#        de forma (alto, ancho) en grises o (alto, ancho, 3) en color.
+#      * np.where(...)    aplica el umbral para blanco y negro.
+#      * np.uint8         garantiza valores enteros entre 0 y 255,
+#        que es lo que BMP y otros formatos esperan.
+import numpy as np
+
+#  io -> trabaja con datos en memoria.
+#      files.upload() NO guarda la imagen en el disco: la deja en
+#      bytes. io.BytesIO envuelve esos bytes para que Pillow los
+#      pueda leer como si fueran un archivo normal.
+import io
+
+#  matplotlib.pyplot -> dibuja la imagen DENTRO del notebook.
+#      Sirve para comprobar visualmente que la reduccion a
+#      ${N} x ${N} pixeles se ve como esperabamos.
+import matplotlib.pyplot as plt
 
 # ---------- PASO 2: parametros del programa ---------------------
 N = ${N}          # ancho y alto de la matriz (${N} x ${N})
-UMBRAL = 128    # corte para decidir negro o blanco: menor a 128 = negro
+UMBRAL = 128    # corte para blanco/negro: menor a 128 = negro
 
 # ---------- PASO 3: subir la imagen -----------------------------
 print("Selecciona una imagen (JPG o PNG):")
-subidos = files.upload()                   # abre la ventana de carga de archivos
-nombre_archivo = list(subidos.keys())[0]   # toma el nombre del primer archivo subido
+subidos = files.upload()                   # abre la ventana de carga
+nombre_archivo = list(subidos.keys())[0]   # nombre del primer archivo
 print("Archivo cargado:", nombre_archivo)
 
 # ---------- PASO 4: abrir la imagen -----------------------------
-# io.BytesIO convierte los bytes subidos en un "archivo" que Pillow puede abrir
+# io.BytesIO convierte los bytes subidos en un "archivo" para Pillow
 imagen = Image.open(io.BytesIO(subidos[nombre_archivo]))
 print("Tamano original (ancho, alto):", imagen.size)
 
 # ---------- PASO 5: convertir a escala de grises y reducir ------
-#  .convert("L")   -> deja UN solo canal: 0 = negro, 255 = blanco
-#  .resize((N, N)) -> reduce la imagen a N x N pixeles
-#  Image.LANCZOS   -> metodo de muestreo de buena calidad (promedia los bloques)
+#  .convert("L")   -> deja UN canal: 0 = negro, 255 = blanco
+#  .resize((N, N)) -> reduce la imagen a ${N} x ${N} pixeles
+#  Image.LANCZOS   -> metodo de muestreo de buena calidad
 imagen_gris = imagen.convert("L").resize((N, N), Image.LANCZOS)
 
 # ---------- PASO 6: convertir la imagen en MATRIZ ---------------
-# np.array() transforma la imagen en una matriz de numeros enteros (0 a 255)
+# np.array() transforma la imagen en una matriz de enteros (0 a 255)
 matriz = np.array(imagen_gris)
 print("Forma de la matriz:", matriz.shape)   # (${N}, ${N})
 
@@ -584,7 +659,7 @@ print(matriz)
 
 # ---------- PASO 8: mostrar la matriz como imagen ---------------
 plt.figure(figsize=(4, 4))
-plt.imshow(matriz, cmap="gray", vmin=0, vmax=255)  # cmap gris de 0 a 255
+plt.imshow(matriz, cmap="gray", vmin=0, vmax=255)
 plt.title("Imagen reducida a ${N} x ${N} pixeles")
 plt.axis("off")   # oculta los ejes
 plt.show()
@@ -592,32 +667,44 @@ plt.show()
 # ---------- PASO 9: RECORRER LA MATRIZ CON FOR ANIDADOS ---------
 #  El PRIMER for recorre las FILAS (i).
 #  El SEGUNDO for recorre las COLUMNAS (j) dentro de esa fila.
-#  matriz[i][j] es el valor del pixel en la fila i y la columna j (0 a 255).
+#  matriz[i][j] es el valor del pixel en la fila i, columna j (0-255).
 print("\n===== MATRIZ DIBUJADA CON FOR ANIDADOS =====")
 
 for i in range(N):              # i = 0, 1, 2, ... , ${N - 1}  -> FILAS
-    linea = ""                  # aqui se va armando la fila como texto
+    linea = ""                  # aqui se arma la fila como texto
     for j in range(N):          # j = 0, 1, 2, ... , ${N - 1}  -> COLUMNAS
-        valor = matriz[i][j]    # se lee el pixel de la fila i, columna j
+        valor = matriz[i][j]    # pixel en la fila i, columna j
         if valor < UMBRAL:
             linea += "##"       # pixel oscuro
         else:
             linea += ".."       # pixel claro
-    print(linea)                # al terminar la fila completa, se imprime
+    print(linea)                # se imprime la fila ya completa
 
-# ---------- PASO 10: crear la version en BLANCO Y NEGRO ---------
+# ---------- PASO 10: guardar BMP en BLANCO Y NEGRO --------------
 # np.where(condicion, valor_si_True, valor_si_False)
+# Todo pixel menor al umbral se vuelve 0 (negro); el resto 255 (blanco)
 bn = np.where(matriz < UMBRAL, 0, 255).astype(np.uint8)
 
-# ---------- PASO 11: guardar el BMP en BLANCO Y NEGRO -----------
 # Se pasa a RGB porque el BMP clasico guarda 3 canales (R, G, B)
 archivo_bn = "matriz_${N}x${N}_blanco_y_negro.bmp"
 Image.fromarray(bn).convert("RGB").save(archivo_bn)
 print("Archivo guardado:", archivo_bn)
 files.download(archivo_bn)      # lo descarga a tu computador
 
-# ---------- PASO 12: version en COLOR ---------------------------
-# Ahora cada pixel tiene 3 valores: matriz_color[i][j] = [R, G, B]
+# ---------- PASO 11: guardar BMP en ESCALA DE GRISES ------------
+#  imagen_gris ya tiene un solo canal con valores 0 a 255.
+#  Solo hay que pasarla a RGB (R = G = B) para que el BMP
+#  tenga 3 canales y sea compatible con cualquier visor.
+grises = np.array(imagen_gris)      # valores 0-255, forma (${N}, ${N})
+print("\nForma de la matriz en grises:", grises.shape)
+
+archivo_gris = "matriz_${N}x${N}_escala_de_grises.bmp"
+Image.fromarray(grises).convert("RGB").save(archivo_gris)
+print("Archivo guardado:", archivo_gris)
+files.download(archivo_gris)
+
+# ---------- PASO 12: guardar BMP EN COLOR -----------------------
+#  Ahora cada pixel tiene 3 valores: matriz_color[i][j] = [R, G, B]
 imagen_color = imagen.convert("RGB").resize((N, N), Image.LANCZOS)
 matriz_color = np.array(imagen_color)
 print("\nForma de la matriz en color:", matriz_color.shape)   # (${N}, ${N}, 3)
@@ -625,7 +712,7 @@ print("\nForma de la matriz en color:", matriz_color.shape)   # (${N}, ${N}, 3)
 for i in range(N):                     # FILAS
     for j in range(N):                 # COLUMNAS
         r, g, b = matriz_color[i][j]   # los 3 canales del pixel
-        # Aqui se puede operar con r, g, b (por ejemplo invertir el color)
+        # Aqui se puede operar con r, g, b (invertir, promediar, etc.)
         # print(f"Fila {i}, Columna {j} -> R={r} G={g} B={b}")
     # fin del for de las columnas
 # fin del for de las filas
@@ -644,7 +731,7 @@ files.download(archivo_color)
   }
 
   /* =========================================================
-     11) PESTAÑAS: mostrar el código del tamaño elegido
+     12) PESTAÑAS: mostrar el código del tamaño elegido
      ========================================================= */
   function mostrarCodigo(n) {
     codigoVisible = codigoPython(n);
@@ -662,7 +749,7 @@ files.download(archivo_color)
   });
 
   /* =========================================================
-     12) BOTÓN COPIAR CÓDIGO
+     13) BOTÓN COPIAR CÓDIGO
      ========================================================= */
   botonCopiar.addEventListener('click', function () {
     const textoOriginal = botonCopiar.textContent;
@@ -679,7 +766,6 @@ files.download(archivo_color)
     }
 
     function copiaAntigua() {
-      // Alternativa para navegadores antiguos o contextos sin HTTPS
       const area = document.createElement('textarea');
       area.value = codigoVisible;
       area.style.position = 'fixed';
@@ -693,7 +779,7 @@ files.download(archivo_color)
   });
 
   /* =========================================================
-     13) INICIALIZACIÓN
+     14) INICIALIZACIÓN
      ========================================================= */
   mostrarCodigo(16);
 })();
